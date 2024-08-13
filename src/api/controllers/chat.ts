@@ -220,7 +220,7 @@ async function createConversation(name: string, model: string, engineType: strin
       question: name,
       mode: model,
       engineType,
-      scholarSearchDomain: "all",
+      scholarSearchDomain: "zh",
     },
     {
       headers: {
@@ -523,6 +523,10 @@ async function receiveStream(model: string, convId: string, stream: any) {
         }
         if (result.type == "append-text")
           data.choices[0].message.content += removeIndexLabel(result.text);
+        else if (result.type == "set-reference")
+          data.choices[0].message.content += '《REFERENCE_START[' + result.list.map(item => JSON.stringify(item)).join(', ') + ']REFERENCE_END》';
+        else if (result.type == "update-reference")
+          data.choices[0].message.content += '《REFERENCE_START[' + result.list.map(item => JSON.stringify(item)).join(', ') + ']REFERENCE_END》';
         else if (result.type == "error")
           data.choices[0].message.content += `[${result.code}]${result.msg}`;
       } catch (err) {
@@ -612,6 +616,38 @@ function createTransStream(
             {
               index: 0,
               delta: { role: "assistant", content: removeIndexLabel(result.text) },
+              finish_reason: null,
+            },
+          ],
+          created,
+        })}\n\n`;
+        !transStream.closed && transStream.write(data);
+      }
+      else if (result.type == "set-reference") {
+        const data = `data: ${JSON.stringify({
+          id: convId,
+          model,
+          object: "chat.completion.chunk",
+          choices: [
+            {
+              index: 0,
+              delta: { role: "assistant", content: '《REFERENCE_START[' + result.list.map(item => JSON.stringify(item)).join(', ') + ']REFERENCE_END》' },
+              finish_reason: null,
+            },
+          ],
+          created,
+        })}\n\n`;
+        !transStream.closed && transStream.write(data);
+      }
+      else if (result.type == "update-reference") {
+        const data = `data: ${JSON.stringify({
+          id: convId,
+          model,
+          object: "chat.completion.chunk",
+          choices: [
+            {
+              index: 0,
+              delta: { role: "assistant", content: '《REFERENCE_START[' + result.list.map(item => JSON.stringify(item)).join(', ') + ']REFERENCE_END》' },
               finish_reason: null,
             },
           ],
